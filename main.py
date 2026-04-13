@@ -108,6 +108,15 @@ class Complaint(BaseModel):
     status: Optional[str] = "Submitted"
     department: Optional[str] = None
 
+class ComplaintOut(BaseModel):
+    id: str
+    student_name: str
+    description: str
+    category: str
+    department: str
+    status: str
+    resolution: str
+
 class StatusUpdate(BaseModel):
     status: str
     resolution: Optional[str] = ""
@@ -123,6 +132,9 @@ def get_db():
 # CREATE Complaint
 @app.post("/complaints")
 def submit_complaint(complaint: Complaint, db: Session = Depends(get_db)):
+    print("Incoming complaint:", complaint)
+    print("Category:", category)
+    print("Department:", department)
     
     # 🧠 AI Classification
     try:
@@ -170,10 +182,14 @@ def submit_complaint(complaint: Complaint, db: Session = Depends(get_db)):
 
     import threading
 
-    threading.Thread(
+    try:
+        threading.Thread(
         target=send_email,
-        args=("karanxgojo@gmail.com", subject, body)
-    ).start()
+        args=("karanxgojo@gmail.com", subject, body),
+        daemon=True
+        ).start()
+    except Exception as e:
+        print("Thread error:", e)
 
     return {
         "id": db_complaint.id,
@@ -187,13 +203,26 @@ def submit_complaint(complaint: Complaint, db: Session = Depends(get_db)):
     }
 
 # GET Complaints
-@app.get("/complaints", response_model=List[Complaint])
+@app.get("/complaints", response_model=List[ComplaintOut])
 def get_complaints(db: Session = Depends(get_db)):
-    return db.query(ComplaintDB).all()
+    complaints = db.query(ComplaintDB).all()
+
+    return [
+        {
+            "id": c.id,
+            "student_name": c.student_name,
+                "description": c.description,
+            "category": c.category,
+            "department": c.department,
+            "status": c.status,
+            "resolution": c.resolution,
+        }
+        for c in complaints
+    ]
 
 # UPDATE Status
 @app.put("/complaints/{complaint_id}/status")
-def update_status(complaint_id: int, status_update: StatusUpdate, db: Session = Depends(get_db)):
+def update_status(complaint_id: str, status_update: StatusUpdate, db: Session = Depends(get_db)):
     complaint = db.query(ComplaintDB).filter(ComplaintDB.id == complaint_id).first()
 
     if complaint:
